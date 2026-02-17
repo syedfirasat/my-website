@@ -1,0 +1,171 @@
+/*
+=========================================
+🔥 100 DAY CHALLENGE APP - MVP BUILD
+Single File Demo (main.dart)
+Requires:
+- Flutter 3+
+- Firebase Auth
+- Cloud Firestore
+- Google Sign In
+=========================================
+*/
+
+import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
+  runApp(const ChallengeApp());
+}
+
+class ChallengeApp extends StatelessWidget {
+  const ChallengeApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData.dark().copyWith(
+        scaffoldBackgroundColor: Colors.black,
+        primaryColor: Colors.white,
+      ),
+      home: const AuthGate(),
+    );
+  }
+}
+
+class AuthGate extends StatelessWidget {
+  const AuthGate({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<User?>(
+      stream: FirebaseAuth.instance.authStateChanges(),
+      builder: (context, snapshot) {
+        if (snapshot.hasData) {
+          return const HomeScreen();
+        }
+        return const LoginScreen();
+      },
+    );
+  }
+}
+
+class LoginScreen extends StatelessWidget {
+  const LoginScreen({super.key});
+
+  Future<void> signInWithGoogle() async {
+    final googleUser = await GoogleSignIn().signIn();
+    final googleAuth = await googleUser!.authentication;
+
+    final credential = GoogleAuthProvider.credential(
+      accessToken: googleAuth.accessToken,
+      idToken: googleAuth.idToken,
+    );
+
+    await FirebaseAuth.instance.signInWithCredential(credential);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Center(
+        child: ElevatedButton(
+          onPressed: signInWithGoogle,
+          child: const Text("Sign in with Google"),
+        ),
+      ),
+    );
+  }
+}
+
+class HomeScreen extends StatelessWidget {
+  const HomeScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser!;
+    final challengeRef = FirebaseFirestore.instance
+        .collection("users")
+        .doc(user.uid)
+        .collection("challenge")
+        .doc("current");
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text("100 Day Challenge"),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: () => FirebaseAuth.instance.signOut(),
+          )
+        ],
+      ),
+      body: FutureBuilder<DocumentSnapshot>(
+        future: challengeRef.get(),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData || !snapshot.data!.exists) {
+            return Center(
+              child: ElevatedButton(
+                onPressed: () async {
+                  await challengeRef.set({
+                    "currentDay": 1,
+                    "streak": 0,
+                    "completedDays": [],
+                  });
+                },
+                child: const Text("Start 100 Day Challenge"),
+              ),
+            );
+          }
+
+          final data = snapshot.data!;
+          int currentDay = data["currentDay"];
+          int streak = data["streak"];
+
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  "Day $currentDay",
+                  style: const TextStyle(fontSize: 40),
+                ),
+                const SizedBox(height: 20),
+                Text("🔥 Streak: $streak days"),
+                const SizedBox(height: 30),
+                ElevatedButton(
+                  onPressed: () async {
+                    await challengeRef.update({
+                      "currentDay": currentDay + 1,
+                      "streak": streak + 1,
+                      "completedDays": FieldValue.arrayUnion([currentDay]),
+                    });
+                  },
+                  child: const Text("Complete Today"),
+                ),
+                const SizedBox(height: 30),
+                const Text(
+                  "AI Message:",
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 10),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 20),
+                  child: Text(
+                    "You showed up today. That is discipline. Keep building.",
+                    textAlign: TextAlign.center,
+                  ),
+                )
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
