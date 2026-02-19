@@ -5,18 +5,97 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>🔥 100 Day AI Challenge PRO</title>
 
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getFirestore, doc, setDoc, getDoc, updateDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+<style>
+body{
+  margin:0;
+  background:#000;
+  color:#fff;
+  font-family:sans-serif;
+  text-align:center;
+}
+.card{
+  background:#111;
+  padding:20px;
+  border-radius:15px;
+  margin:20px;
+}
+button{
+  padding:10px 20px;
+  border-radius:8px;
+  border:none;
+  background:#fff;
+  color:#000;
+  font-weight:bold;
+  cursor:pointer;
+}
+button:hover{
+  opacity:0.8;
+}
+input,select{
+  padding:10px;
+  border-radius:8px;
+  border:none;
+}
+</style>
+</head>
 
-const firebaseConfig = {100daysaicore.netlify.app
-  apiKey: "YOUR_FIREBASE_CONFIG",
-  authDomain: "YOUR_FIREBASE_CONFIG",
-  projectId: "YOUR_FIREBASE_CONFIG",
-  storageBucket: "YOUR_FIREBASE_CONFIG",
-  messagingSenderId: "YOUR_FIREBASE_CONFIG",
-  appId: "YOUR_FIREBASE_CONFIG"
+<body>
+
+<div id="login">
+<h1>🔥 100 Day AI PRO</h1>
+<button id="googleLogin">Sign in with Google</button>
+</div>
+
+<div id="app" style="display:none;">
+
+<div class="card">
+<select id="goal">
+<option>Gym Transformation</option>
+<option>Personality Development</option>
+<option>Discipline Building</option>
+<option>Custom Growth</option>
+</select>
+<button id="startBtn">Start Challenge</button>
+</div>
+
+<div class="card">
+<h2 id="day"></h2>
+<p id="task"></p>
+<button id="completeBtn">Complete Today</button>
+<p id="ai"></p>
+</div>
+
+<div class="card">
+<p id="streak"></p>
+<p id="progress"></p>
+<button id="weeklyBtn">Weekly Report</button>
+</div>
+
+<div class="card">
+<button id="logoutBtn">Logout</button>
+</div>
+
+</div>
+
+<script type="module">
+
+import { initializeApp } 
+from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+
+import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } 
+from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+
+import { getFirestore, doc, setDoc, getDoc, updateDoc, arrayUnion } 
+from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+/* 🔥 REPLACE THESE WITH YOUR REAL FIREBASE VALUES */
+const firebaseConfig = {
+  apiKey: "PASTE_API_KEY",
+  authDomain: "yourproject.firebaseapp.com",
+  projectId: "yourproject",
+  storageBucket: "yourproject.appspot.com",
+  messagingSenderId: "PASTE_SENDER_ID",
+  appId: "PASTE_APP_ID"
 };
 
 const app = initializeApp(firebaseConfig);
@@ -25,11 +104,24 @@ const db = getFirestore(app);
 const provider = new GoogleAuthProvider();
 
 let user = null;
-let voiceEnabled = true;
 
-// Google Login
-window.login = () => signInWithPopup(auth, provider);
-window.logout = () => signOut(auth);
+/* ================= LOGIN ================= */
+
+document.getElementById("googleLogin").addEventListener("click", async () => {
+  try{
+    await signInWithPopup(auth, provider);
+  }catch(err){
+    alert(err.message);
+  }
+});
+
+/* ================= LOGOUT ================= */
+
+document.getElementById("logoutBtn").addEventListener("click", async () => {
+  await signOut(auth);
+});
+
+/* ================= AUTH STATE ================= */
 
 onAuthStateChanged(auth, async (u) => {
   if (u) {
@@ -37,178 +129,85 @@ onAuthStateChanged(auth, async (u) => {
     document.getElementById("login").style.display="none";
     document.getElementById("app").style.display="block";
     loadChallenge();
+  } else {
+    document.getElementById("login").style.display="block";
+    document.getElementById("app").style.display="none";
   }
 });
 
-// Start Challenge
-window.startChallenge = async () => {
-  let goal = document.getElementById("goal").value;
-  let aiPlan = await fetch("/.netlify/functions/ai", {
-    method:"POST",
-    body: JSON.stringify({goal})
-  }).then(r=>r.json());
+/* ================= START ================= */
+
+document.getElementById("startBtn").addEventListener("click", async () => {
+
+  if(!user) return alert("Login first.");
+
+  const goal = document.getElementById("goal").value;
 
   await setDoc(doc(db,"users",user.uid),{
-    goal,
+    goal:goal,
     currentDay:1,
     streak:0,
     completed:[],
-    missed:[],
     created:new Date()
   });
 
-  localStorage.setItem("cachedPlan", JSON.stringify(aiPlan));
   loadChallenge();
-};
+});
 
-// Load Challenge
+/* ================= LOAD ================= */
+
 async function loadChallenge(){
-  let snap = await getDoc(doc(db,"users",user.uid));
+
+  if(!user) return;
+
+  const snap = await getDoc(doc(db,"users",user.uid));
   if(!snap.exists()) return;
-  let data = snap.data();
 
-  let day = data.currentDay;
-  let difficulty = Math.min(1 + Math.floor(day/20),5);
+  const data = snap.data();
 
-  document.getElementById("day").innerText="Day "+day;
-  document.getElementById("task").innerText=
-    "Level "+difficulty+" Task for "+data.goal;
+  document.getElementById("day").innerText = "Day " + data.currentDay;
+  document.getElementById("task").innerText = "Today's mission for: " + data.goal;
+  document.getElementById("streak").innerText = "🔥 Streak: " + data.streak;
 
-  document.getElementById("streak").innerText=
-    "🔥 Streak: "+data.streak;
-
-  let percent=Math.floor((data.completed.length/100)*100);
-  document.getElementById("progress").innerText=
-    "Progress: "+percent+"%";
+  const percent = Math.floor((data.completed.length / 100) * 100);
+  document.getElementById("progress").innerText = "Progress: " + percent + "%";
 }
 
-// Complete Day
-window.completeDay = async () => {
-  let ref = doc(db,"users",user.uid);
-  let snap = await getDoc(ref);
-  let data = snap.data();
+/* ================= COMPLETE DAY ================= */
 
-  let missed = false;
-  if(data.currentDay > data.completed.length+1){
-    missed=true;
-  }
+document.getElementById("completeBtn").addEventListener("click", async () => {
+
+  if(!user) return;
+
+  const ref = doc(db,"users",user.uid);
+  const snap = await getDoc(ref);
+  const data = snap.data();
 
   await updateDoc(ref,{
-    currentDay:data.currentDay+1,
-    streak:data.streak+1,
+    currentDay:data.currentDay + 1,
+    streak:data.streak + 1,
     completed:arrayUnion(data.currentDay)
   });
 
-  let ai = await fetch("/.netlify/functions/ai",{
-    method:"POST",
-    body:JSON.stringify({
-      messageType:"motivation",
-      streak:data.streak+1,
-      missed
-    })
-  }).then(r=>r.json());
+  document.getElementById("ai").innerText = 
+    "🔥 Strong work! Keep building momentum.";
 
-  document.getElementById("ai").innerText=ai.text;
-  speak(ai.text);
   loadChallenge();
-};
+});
 
-// Weekly Report
-window.weeklyReport = async ()=>{
-  let ref = doc(db,"users",user.uid);
-  let snap = await getDoc(ref);
-  let data = snap.data();
+/* ================= WEEKLY REPORT ================= */
 
-  let ai = await fetch("/.netlify/functions/ai",{
-    method:"POST",
-    body:JSON.stringify({
-      messageType:"weekly",
-      completed:data.completed.length
-    })
-  }).then(r=>r.json());
+document.getElementById("weeklyBtn").addEventListener("click", async () => {
 
-  alert(ai.text);
-};
+  if(!user) return;
 
-// Voice
-function speak(text){
-  if(!voiceEnabled) return;
-  let speech=new SpeechSynthesisUtterance(text);
-  speech.rate=1;
-  speech.pitch=1;
-  speechSynthesis.speak(speech);
-}
-window.toggleVoice=()=>voiceEnabled=!voiceEnabled;
+  const snap = await getDoc(doc(db,"users",user.uid));
+  const data = snap.data();
 
-// Alarm
-window.setAlarm=()=>{
-  let t=document.getElementById("alarm").value;
-  localStorage.setItem("alarm",t);
-  alert("Alarm Set");
-};
-
-setInterval(()=>{
-  let alarm=localStorage.getItem("alarm");
-  if(!alarm) return;
-  let now=new Date();
-  let time=now.getHours().toString().padStart(2,"0")+":"+
-           now.getMinutes().toString().padStart(2,"0");
-  if(time===alarm){
-    let msg="Time for your daily challenge.";
-    alert(msg);
-    speak(msg);
-  }
-},60000);
+  alert("You have completed " + data.completed.length + " days so far.");
+});
 
 </script>
 
-<style>
-body{margin:0;background:#000;color:#fff;font-family:sans-serif;text-align:center;}
-.card{background:#111;padding:20px;border-radius:15px;margin:20px;}
-button{padding:10px 20px;border-radius:8px;border:none;background:#fff;color:#000;font-weight:bold;}
-input,select{padding:10px;border-radius:8px;border:none;}
-</style>
-</head>
-
-<body>
-
-<div id="login">
-<h1>🔥 100 Day AI PRO</h1>
-<button onclick="login()">Sign in with Google</button>
-</div>
-
-<div id="app" style="display:none;">
-<div class="card">
-<select id="goal">
-<option>Gym Transformation</option>
-<option>Personality Development</option>
-<option>Discipline Building</option>
-<option>Custom Growth</option>
-</select>
-<button onclick="startChallenge()">Start</button>
-</div>
-
-<div class="card">
-<h2 id="day"></h2>
-<p id="task"></p>
-<button onclick="completeDay()">Complete</button>
-<p id="ai"></p>
-</div>
-
-<div class="card">
-<p id="streak"></p>
-<p id="progress"></p>
-<button onclick="weeklyReport()">Weekly Report</button>
-</div>
-
-<div class="card">
-<input type="time" id="alarm">
-<button onclick="setAlarm()">Set Alarm</button>
-<button onclick="toggleVoice()">Toggle Voice</button>
-<button onclick="logout()">Logout</button>
-</div>
-</div>
-
 </body>
 </html>
-
